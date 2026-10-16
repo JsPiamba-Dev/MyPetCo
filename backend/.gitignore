@@ -1,0 +1,35 @@
+@'
+# compilado
+/dist
+/node_modules
+/build
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# sistema operativo
+.DS_Store
+Thumbs.db
+
+# pruebas
+/coverage
+/.nyc_output
+
+# editores
+/.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# variables de entorno (el .env.example sí se sube)
+.env
+.env.*
+!.env.example
+
+# cliente generado por Prisma
+/src/generated/
+'@ | Set-Content backend\.gitignore -Encoding ascii
