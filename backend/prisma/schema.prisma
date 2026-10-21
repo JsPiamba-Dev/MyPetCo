@@ -1,0 +1,501 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model autorizaciones_datos {
+  id                       String       @id @db.Char(36)
+  usuario_id               String       @db.Char(36)
+  proveedor_id             String?      @db.Char(36)
+  finalidad                String       @db.VarChar(255)
+  fecha_autorizacion       DateTime     @default(now())
+  fecha_revocacion         DateTime?
+  vigente                  Boolean      @default(true)
+  version_aviso_privacidad String       @db.VarChar(30)
+  proveedores              proveedores? @relation(fields: [proveedor_id], references: [cuenta_id], map: "fk_autorizaciones_proveedor")
+  usuarios                 usuarios     @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_autorizaciones_usuario")
+
+  @@index([proveedor_id], map: "idx_autorizaciones_proveedor")
+  @@index([usuario_id, vigente], map: "idx_autorizaciones_usuario_vigente")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model campanas {
+  publicacion_id    String                @id @db.Char(36)
+  tipo_campana      campanas_tipo_campana
+  fecha_inicio      DateTime
+  fecha_fin         DateTime
+  lugar             String?               @db.VarChar(255)
+  cupos_totales     Int?                  @db.UnsignedInt
+  cupos_disponibles Int?                  @db.UnsignedInt
+  requisitos        String?               @db.Text
+  publicaciones     publicaciones         @relation(fields: [publicacion_id], references: [id], onDelete: Cascade, map: "fk_campanas_publicacion")
+
+  @@index([tipo_campana, fecha_inicio, fecha_fin], map: "idx_campanas_tipo_fechas")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model cuentas_acceso {
+  id                   String                 @id @db.Char(36)
+  correo               String                 @unique(map: "uq_cuentas_acceso_correo") @db.VarChar(255)
+  hash_contrasena      String                 @db.VarChar(255)
+  rol                  cuentas_acceso_rol
+  estado               cuentas_acceso_estado  @default(PENDIENTE_VERIFICACION)
+  fecha_registro       DateTime               @default(now())
+  ultimo_acceso        DateTime?
+  historial_salud      historial_salud[]
+  proveedores          proveedores?
+  registros_vacunacion registros_vacunacion[]
+  usuarios             usuarios?
+
+  token_recuperacion_hash   String?   @unique(map: "uq_cuentas_acceso_token_recuperacion_hash") @db.Char(64)
+  token_recuperacion_expira DateTime?
+
+  @@index([rol, estado], map: "idx_cuentas_acceso_rol_estado")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model empresas {
+  proveedor_id              String      @id @db.Char(36)
+  identificacion_tributaria String      @unique(map: "uq_empresas_identificacion_tributaria") @db.VarChar(30)
+  categoria_comercial       String?     @db.VarChar(100)
+  proveedores               proveedores @relation(fields: [proveedor_id], references: [cuenta_id], onDelete: Cascade, map: "fk_empresas_proveedor")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model historial_salud {
+  id                  String                      @id @db.Char(36)
+  mascota_id          String                      @db.Char(36)
+  registrado_por_id   String                      @db.Char(36)
+  fecha_evento        DateTime                    @db.Date
+  tipo_evento         historial_salud_tipo_evento
+  descripcion         String                      @db.Text
+  tratamiento         String?                     @db.Text
+  observaciones       String?                     @db.Text
+  comprobante         String?                     @db.VarChar(500)
+  fecha_creacion      DateTime                    @default(now())
+  fecha_actualizacion DateTime                    @default(now())
+  mascotas            mascotas                    @relation(fields: [mascota_id], references: [id], onDelete: Cascade, map: "fk_historial_salud_mascota")
+  cuentas_acceso      cuentas_acceso              @relation(fields: [registrado_por_id], references: [id], map: "fk_historial_salud_registrado_por")
+
+  @@index([mascota_id, fecha_evento], map: "idx_historial_salud_mascota_fecha")
+  @@index([registrado_por_id], map: "idx_historial_salud_registrado_por")
+  @@index([tipo_evento], map: "idx_historial_salud_tipo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model mascotas {
+  id                    String                 @id @db.Char(36)
+  propietario_id        String                 @db.Char(36)
+  nombre                String                 @db.VarChar(100)
+  especie               mascotas_especie
+  raza                  String?                @db.VarChar(100)
+  fecha_nacimiento      DateTime?              @db.Date
+  edad_aproximada_meses Int?                   @db.UnsignedInt
+  sexo                  mascotas_sexo          @default(DESCONOCIDO)
+  peso_kg               Decimal?               @db.Decimal(5, 2)
+  esterilizada          Boolean                @default(false)
+  fecha_esterilizacion  DateTime?              @db.Date
+  foto                  String?                @db.VarChar(500)
+  observaciones         String?                @db.Text
+  fecha_registro        DateTime               @default(now())
+  fecha_retiro          DateTime?
+  historial_salud       historial_salud[]
+  usuarios              usuarios               @relation(fields: [propietario_id], references: [cuenta_id], map: "fk_mascotas_propietario")
+  recomendaciones       recomendaciones[]
+  recordatorios         recordatorios[]
+  registros_peso        registros_peso[]
+  registros_vacunacion  registros_vacunacion[]
+
+  @@index([especie, raza], map: "idx_mascotas_especie_raza")
+  @@index([propietario_id, nombre], map: "idx_mascotas_propietario_nombre")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model notificaciones {
+  id              String                @id @db.Char(36)
+  recordatorio_id String                @db.Char(36)
+  mensaje         String                @db.Text
+  canal           notificaciones_canal
+  fecha_envio     DateTime?
+  estado          notificaciones_estado @default(PENDIENTE)
+  fecha_lectura   DateTime?
+  recordatorios   recordatorios         @relation(fields: [recordatorio_id], references: [id], onDelete: Cascade, map: "fk_notificaciones_recordatorio")
+
+  @@index([estado, canal], map: "idx_notificaciones_estado_canal")
+  @@index([recordatorio_id], map: "idx_notificaciones_recordatorio")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model preferencias_usuario {
+  id                     String            @id @db.Char(36)
+  usuario_id             String            @unique(map: "uq_preferencias_usuario_usuario") @db.Char(36)
+  ciudad_preferida       String?           @db.VarChar(100)
+  categorias_interes     String?           @db.VarChar(500)
+  acepta_recomendaciones Boolean           @default(false)
+  acepta_notificaciones  Boolean           @default(true)
+  usuarios               usuarios          @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_preferencias_usuario")
+  recomendaciones        recomendaciones[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model productos {
+  publicacion_id   String                      @id @db.Char(36)
+  categoria        String                      @db.VarChar(100)
+  especie_objetivo productos_especie_objetivo?
+  etapa_vida       productos_etapa_vida        @default(NO_ESPECIFICADA)
+  precio           Decimal?                    @db.Decimal(12, 2)
+  moneda           String                      @default("COP") @db.Char(3)
+  enlace_compra    String?                     @db.VarChar(500)
+  disponibilidad   String?                     @db.VarChar(100)
+  publicaciones    publicaciones               @relation(fields: [publicacion_id], references: [id], onDelete: Cascade, map: "fk_productos_publicacion")
+
+  @@index([categoria, especie_objetivo], map: "idx_productos_categoria_especie")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model proveedores {
+  cuenta_id            String                       @id @db.Char(36)
+  nombre_comercial     String                       @db.VarChar(150)
+  descripcion          String?                      @db.Text
+  telefono_contacto    String?                      @db.VarChar(30)
+  ciudad               String?                      @db.VarChar(100)
+  direccion            String?                      @db.VarChar(255)
+  sitio_web            String?                      @db.VarChar(255)
+  estado_proveedor     proveedores_estado_proveedor @default(PENDIENTE_VERIFICACION)
+  autorizaciones_datos autorizaciones_datos[]
+  empresas             empresas?
+  cuentas_acceso       cuentas_acceso               @relation(fields: [cuenta_id], references: [id], onDelete: Cascade, map: "fk_proveedores_cuenta")
+  publicaciones        publicaciones[]
+  veterinarias         veterinarias?
+
+  @@index([estado_proveedor, ciudad], map: "idx_proveedores_estado_ciudad")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model publicaciones {
+  id                  String             @id @db.Char(36)
+  proveedor_id        String             @db.Char(36)
+  tipo                publicaciones_tipo
+  titulo              String             @db.VarChar(150)
+  descripcion         String?            @db.Text
+  ciudad              String?            @db.VarChar(100)
+  imagen              String?            @db.VarChar(500)
+  activa              Boolean            @default(true)
+  fecha_publicacion   DateTime           @default(now())
+  fecha_actualizacion DateTime           @default(now())
+  campanas            campanas?
+  productos           productos?
+  proveedores         proveedores        @relation(fields: [proveedor_id], references: [cuenta_id], onDelete: Cascade, map: "fk_publicaciones_proveedor")
+  recomendaciones     recomendaciones[]
+  servicios           servicios?
+
+  @@index([activa, tipo, ciudad], map: "idx_publicaciones_activa_tipo_ciudad")
+  @@index([proveedor_id], map: "idx_publicaciones_proveedor")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model recomendaciones {
+  id                     String                 @id @db.Char(36)
+  usuario_id             String                 @db.Char(36)
+  publicacion_id         String                 @db.Char(36)
+  mascota_id             String?                @db.Char(36)
+  preferencia_usuario_id String?                @db.Char(36)
+  motivo                 String?                @db.VarChar(255)
+  fecha_generacion       DateTime               @default(now())
+  puntuacion             Decimal?               @db.Decimal(5, 2)
+  estado                 recomendaciones_estado @default(NUEVA)
+  mascotas               mascotas?              @relation(fields: [mascota_id], references: [id], map: "fk_recomendaciones_mascota")
+  preferencias_usuario   preferencias_usuario?  @relation(fields: [preferencia_usuario_id], references: [id], map: "fk_recomendaciones_preferencia")
+  publicaciones          publicaciones          @relation(fields: [publicacion_id], references: [id], onDelete: Cascade, map: "fk_recomendaciones_publicacion")
+  usuarios               usuarios               @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_recomendaciones_usuario")
+
+  @@index([mascota_id], map: "idx_recomendaciones_mascota")
+  @@index([preferencia_usuario_id], map: "idx_recomendaciones_preferencia")
+  @@index([publicacion_id], map: "idx_recomendaciones_publicacion")
+  @@index([usuario_id, estado], map: "idx_recomendaciones_usuario_estado")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model recordatorios {
+  id                     String                @id @db.Char(36)
+  usuario_id             String                @db.Char(36)
+  mascota_id             String                @db.Char(36)
+  registro_vacunacion_id String?               @db.Char(36)
+  titulo                 String                @db.VarChar(150)
+  descripcion            String?               @db.Text
+  fecha_programada       DateTime
+  tipo                   recordatorios_tipo
+  estado                 recordatorios_estado  @default(PROGRAMADO)
+  fecha_creacion         DateTime              @default(now())
+  fecha_completado       DateTime?
+  notificaciones         notificaciones[]
+  mascotas               mascotas              @relation(fields: [mascota_id], references: [id], onDelete: Cascade, map: "fk_recordatorios_mascota")
+  registros_vacunacion   registros_vacunacion? @relation(fields: [registro_vacunacion_id], references: [id], map: "fk_recordatorios_registro_vacunacion")
+  usuarios               usuarios              @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_recordatorios_usuario")
+
+  @@index([estado, fecha_programada], map: "idx_recordatorios_estado_fecha")
+  @@index([mascota_id], map: "idx_recordatorios_mascota")
+  @@index([registro_vacunacion_id], map: "idx_recordatorios_registro_vacunacion")
+  @@index([usuario_id], map: "idx_recordatorios_usuario")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model registros_peso {
+  id             String   @id @db.Char(36)
+  mascota_id     String   @db.Char(36)
+  peso_kg        Decimal  @db.Decimal(5, 2)
+  fecha_medicion DateTime @db.Date
+  fecha_creacion DateTime @default(now())
+  mascotas       mascotas @relation(fields: [mascota_id], references: [id], onDelete: Cascade, map: "fk_registros_peso_mascota")
+
+  @@index([mascota_id, fecha_medicion], map: "idx_registros_peso_mascota_fecha")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model registros_vacunacion {
+  id                       String                      @id @db.Char(36)
+  mascota_id               String                      @db.Char(36)
+  vacuna_id                String                      @db.Char(36)
+  regla_vacunacion_id      String?                     @db.Char(36)
+  registrado_por_id        String                      @db.Char(36)
+  veterinaria_id           String?                     @db.Char(36)
+  fecha_aplicacion         DateTime?                   @db.Date
+  dosis                    String?                     @db.VarChar(60)
+  lote                     String?                     @db.VarChar(60)
+  observaciones            String?                     @db.Text
+  fecha_proxima_aplicacion DateTime?                   @db.Date
+  origen                   registros_vacunacion_origen
+  estado                   registros_vacunacion_estado @default(APLICADA_DECLARADA)
+  comprobante              String?                     @db.VarChar(500)
+  fecha_creacion           DateTime                    @default(now())
+  recordatorios            recordatorios[]
+  mascotas                 mascotas                    @relation(fields: [mascota_id], references: [id], onDelete: Cascade, map: "fk_registros_vacunacion_mascota")
+  cuentas_acceso           cuentas_acceso              @relation(fields: [registrado_por_id], references: [id], map: "fk_registros_vacunacion_registrado_por")
+  reglas_vacunacion        reglas_vacunacion?          @relation(fields: [regla_vacunacion_id], references: [id], map: "fk_registros_vacunacion_regla")
+  vacunas                  vacunas                     @relation(fields: [vacuna_id], references: [id], map: "fk_registros_vacunacion_vacuna")
+  veterinarias             veterinarias?               @relation(fields: [veterinaria_id], references: [proveedor_id], map: "fk_registros_vacunacion_veterinaria")
+
+  @@index([estado], map: "idx_registros_vacunacion_estado")
+  @@index([mascota_id, fecha_proxima_aplicacion], map: "idx_registros_vacunacion_mascota_proxima")
+  @@index([registrado_por_id], map: "idx_registros_vacunacion_registrado_por")
+  @@index([regla_vacunacion_id], map: "idx_registros_vacunacion_regla")
+  @@index([vacuna_id], map: "idx_registros_vacunacion_vacuna")
+  @@index([veterinaria_id], map: "idx_registros_vacunacion_veterinaria")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model reglas_vacunacion {
+  id                            String                    @id @db.Char(36)
+  vacuna_id                     String                    @db.Char(36)
+  especie                       reglas_vacunacion_especie
+  edad_minima_meses             Int                       @default(0) @db.UnsignedInt
+  edad_maxima_meses             Int?                      @db.UnsignedInt
+  intervalo_refuerzo_dias       Int?                      @db.UnsignedInt
+  numero_dosis                  Int                       @default(1) @db.UnsignedInt
+  observaciones                 String?                   @db.Text
+  fuente_referencia             String?                   @db.VarChar(255)
+  fecha_revision                DateTime?                 @db.Date
+  requiere_revision_veterinaria Boolean                   @default(true)
+  registros_vacunacion          registros_vacunacion[]
+  vacunas                       vacunas                   @relation(fields: [vacuna_id], references: [id], map: "fk_reglas_vacunacion_vacuna")
+
+  @@index([especie, edad_minima_meses], map: "idx_reglas_vacunacion_especie_edad")
+  @@index([vacuna_id], map: "idx_reglas_vacunacion_vacuna")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model servicios {
+  publicacion_id   String                      @id @db.Char(36)
+  categoria        String                      @db.VarChar(100)
+  especie_objetivo servicios_especie_objetivo?
+  modalidad        String?                     @db.VarChar(60)
+  precio_desde     Decimal?                    @db.Decimal(12, 2)
+  requisitos       String?                     @db.Text
+  publicaciones    publicaciones               @relation(fields: [publicacion_id], references: [id], onDelete: Cascade, map: "fk_servicios_publicacion")
+
+  @@index([categoria, especie_objetivo], map: "idx_servicios_categoria_especie")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model usuarios {
+  cuenta_id            String                 @id @db.Char(36)
+  nombre               String                 @db.VarChar(150)
+  numero_documento     String?                @unique(map: "uq_usuarios_numero_documento") @db.VarChar(30)
+  telefono             String?                @db.VarChar(30)
+  ciudad               String?                @db.VarChar(100)
+  direccion            String?                @db.VarChar(255)
+  autorizaciones_datos autorizaciones_datos[]
+  mascotas             mascotas[]
+  preferencias_usuario preferencias_usuario?
+  recomendaciones      recomendaciones[]
+  recordatorios        recordatorios[]
+  cuentas_acceso       cuentas_acceso         @relation(fields: [cuenta_id], references: [id], onDelete: Cascade, map: "fk_usuarios_cuenta")
+
+  @@index([ciudad], map: "idx_usuarios_ciudad")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model vacunas {
+  id                   String                 @id @db.Char(36)
+  nombre               String                 @unique(map: "uq_vacunas_nombre") @db.VarChar(120)
+  descripcion          String?                @db.Text
+  fabricante           String?                @db.VarChar(120)
+  activa               Boolean                @default(true)
+  registros_vacunacion registros_vacunacion[]
+  reglas_vacunacion    reglas_vacunacion[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model veterinarias {
+  proveedor_id         String                 @id @db.Char(36)
+  nombre_responsable   String                 @db.VarChar(150)
+  registro_profesional String                 @unique(map: "uq_veterinarias_registro_profesional") @db.VarChar(60)
+  horario_atencion     String?                @db.VarChar(255)
+  servicios_clinicos   String?                @db.Text
+  registros_vacunacion registros_vacunacion[]
+  proveedores          proveedores            @relation(fields: [proveedor_id], references: [cuenta_id], onDelete: Cascade, map: "fk_veterinarias_proveedor")
+}
+
+enum campanas_tipo_campana {
+  VACUNACION
+  ESTERILIZACION
+  ADOPCION
+  BIENESTAR_ANIMAL
+  OTRO
+}
+
+enum productos_especie_objetivo {
+  PERRO
+  GATO
+}
+
+enum publicaciones_tipo {
+  CAMPANA
+  PRODUCTO
+  SERVICIO
+}
+
+enum reglas_vacunacion_especie {
+  PERRO
+  GATO
+}
+
+enum servicios_especie_objetivo {
+  PERRO
+  GATO
+}
+
+enum cuentas_acceso_rol {
+  PROPIETARIO
+  VETERINARIA
+  EMPRESA
+  ADMINISTRADOR
+}
+
+enum mascotas_especie {
+  PERRO
+  GATO
+}
+
+enum notificaciones_canal {
+  INTERNA
+  CORREO
+}
+
+enum productos_etapa_vida {
+  CACHORRO_GATITO
+  JOVEN
+  ADULTO
+  SENIOR
+  NO_ESPECIFICADA
+}
+
+enum cuentas_acceso_estado {
+  PENDIENTE_VERIFICACION
+  ACTIVA
+  SUSPENDIDA
+  DESACTIVADA
+}
+
+enum historial_salud_tipo_evento {
+  CONSULTA
+  ENFERMEDAD
+  TRATAMIENTO
+  CIRUGIA
+  DESPARASITACION
+  ESTERILIZACION
+  CONTROL
+  OTRO
+}
+
+enum notificaciones_estado {
+  PENDIENTE
+  ENVIADA
+  LEIDA
+  FALLIDA
+}
+
+enum mascotas_sexo {
+  MACHO
+  HEMBRA
+  DESCONOCIDO
+}
+
+enum proveedores_estado_proveedor {
+  PENDIENTE_VERIFICACION
+  ACTIVO
+  SUSPENDIDO
+  INACTIVO
+}
+
+enum recordatorios_tipo {
+  VACUNACION
+  CONTROL_VETERINARIO
+  DESPARASITACION
+  ESTERILIZACION
+  MEDICACION
+  OTRO
+}
+
+enum recomendaciones_estado {
+  NUEVA
+  VISTA
+  GUARDADA
+  DESCARTADA
+}
+
+enum recordatorios_estado {
+  PROGRAMADO
+  ENVIADO
+  COMPLETADO
+  POSPUESTO
+  CANCELADO
+}
+
+enum registros_vacunacion_origen {
+  PROPIETARIO
+  VETERINARIA
+  IMPORTADO
+}
+
+enum registros_vacunacion_estado {
+  APLICADA_DECLARADA
+  APLICADA_VERIFICADA
+  PENDIENTE
+  POR_VERIFICAR
+  ANULADA
+}

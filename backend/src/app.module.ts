@@ -1,21 +1,19 @@
 import { Module } from '@nestjs/common';
-import { createObserveModule } from '@nestjs/observe';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-
-export const { ObserveModule, ObserveInstrument } = createObserveModule();
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { PrismaService } from './prisma.service';
+import { AuthController } from './auth/auth.controller';
+import { AuthService } from './auth/auth.service';
+import { PetsController } from './pets/pets.controller';
+import { PetsService } from './pets/pets.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    ObserveModule.forRoot({
-      appKey: 'YOUR_APP_KEY',
-      appSecret: 'YOUR_APP_SECRET',
-      serviceId: 'backend',
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    JwtModule.register({ secret: process.env.JWT_SECRET || 'solo-desarrollo-cambiar-secreto', signOptions: { expiresIn: '8h' } }),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AuthController, PetsController],
+  providers: [PrismaService, AuthService, PetsService, JwtAuthGuard],
 })
 export class AppModule {}
