@@ -19,8 +19,34 @@ import {
 } from "lucide-react";
 
 import { apiFetch } from "../../lib/api";
-import { authService, type User } from "../../services/auth.service";
+import {
+  authService,
+  type User,
+  type UserRole,
+} from "../../services/auth.service";
 import { petsService, type Pet } from "../../services/pets.service";
+
+import Vacunacion from "../../components/vacunacion";
+
+type ProviderProfile = {
+  nombre_comercial: string;
+  descripcion: string | null;
+  telefono_contacto: string | null;
+  ciudad: string | null;
+  direccion: string | null;
+  sitio_web: string | null;
+  estado_proveedor: string;
+  veterinaria?: {
+    nombre_responsable: string;
+    registro_profesional: string;
+    horario_atencion: string | null;
+    servicios_clinicos: string | null;
+  } | null;
+  empresa?: {
+    identificacion_tributaria: string;
+    categoria_comercial: string | null;
+  } | null;
+};
 
 type CurrentUser = {
   id: string;
@@ -31,7 +57,9 @@ type CurrentUser = {
   cuenta: {
     correo: string;
     estado: string;
+    rol: UserRole;
   };
+  proveedor?: ProviderProfile | null;
 };
 
 const MAX_PET_AGE_YEARS = 30;
@@ -142,11 +170,65 @@ function isOlderThanMaximumAge(birthDate: string): boolean {
   return birth < oldestAllowed;
 }
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  PROPIETARIO: "Propietario de mascota",
+  VETERINARIA: "Veterinaria",
+  EMPRESA: "Empresa",
+  ADMINISTRADOR: "Administrador",
+};
+
+function getDashboardContent(rol: UserRole) {
+  switch (rol) {
+    case "PROPIETARIO":
+      return {
+        eyebrow: "TU ESPACIO DE BIENESTAR",
+        title: "El bienestar de tus mascotas",
+        description: "Administra sus perfiles y organiza sus cuidados.",
+      };
+
+    case "VETERINARIA":
+      return {
+        eyebrow: "PANEL PROFESIONAL",
+        title: "Tu centro veterinario",
+        description: "Consulta la información de tu establecimiento.",
+      };
+
+    case "EMPRESA":
+      return {
+        eyebrow: "PANEL COMERCIAL",
+        title: "Tu empresa en MyPetCo",
+        description: "Gestiona la información de tu negocio.",
+      };
+
+    case "ADMINISTRADOR":
+      return {
+        eyebrow: "ADMINISTRACIÓN",
+        title: "Panel de administración",
+        description: "Gestiona la plataforma según tus permisos.",
+      };
+  }
+}
+
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVA: "Cuenta activa",
+    ACTIVO: "Proveedor activo",
+    PENDIENTE_VERIFICACION: "Pendiente de verificación",
+    SUSPENDIDA: "Cuenta suspendida",
+    SUSPENDIDO: "Proveedor suspendido",
+    DESACTIVADA: "Cuenta desactivada",
+    INACTIVO: "Proveedor inactivo",
+  };
+
+  return labels[status] ?? status.replaceAll("_", " ");
+}
+
 export default function DashboardPage() {
   const router = useRouter();
 
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -181,26 +263,35 @@ export default function DashboardPage() {
 
         if (cancelled) return;
 
+        const rol = me.cuenta.rol;
+
         setToken(savedToken);
+        setCurrentUser(me);
+
         setUser({
           id: me.id,
           nombre: me.nombre,
           correo: me.cuenta.correo,
+          rol,
         });
 
-        try {
-          const list = await petsService.list();
+        // El módulo de mascotas pertenece al rol PROPIETARIO.
+        // No llamamos a este endpoint para veterinarias, empresas ni administradores.
+        if (rol === "PROPIETARIO") {
+          try {
+            const list = await petsService.list();
 
-          if (!cancelled) {
-            setPets(list);
-          }
-        } catch (err) {
-          if (!cancelled) {
-            setError(
-              err instanceof Error
-                ? `No se pudieron cargar las mascotas: ${err.message}`
-                : "No se pudieron cargar las mascotas.",
-            );
+            if (!cancelled) {
+              setPets(list);
+            }
+          } catch (err) {
+            if (!cancelled) {
+              setError(
+                err instanceof Error
+                  ? `No se pudieron cargar las mascotas: ${err.message}`
+                  : "No se pudieron cargar las mascotas.",
+              );
+            }
           }
         }
       } catch {
@@ -222,6 +313,40 @@ export default function DashboardPage() {
     };
   }, [router]);
 
+  function ProfileItem({
+    label,
+    value,
+  }: {
+    label: string;
+    value?: string | null;
+  }) {
+    return (
+      <div className="rounded-xl bg-slate-50 p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          {label}
+        </p>
+        <p className="mt-2 break-words text-sm font-semibold text-slate-800">
+          {value || "No registrado"}
+        </p>
+      </div>
+    );
+  }
+
+  function AdminAction({
+    title,
+    description,
+  }: {
+    title: string;
+    description: string;
+  }) {
+    return (
+      <div className="rounded-xl border border-slate-100 p-4">
+        <h3 className="font-semibold text-slate-800">{title}</h3>
+        <p className="mt-2 text-sm leading-5 text-slate-500">{description}</p>
+      </div>
+    );
+  }
+
   function logout() {
     // Eliminar el token y cerrar la sesión.
     authService.logout();
@@ -229,7 +354,9 @@ export default function DashboardPage() {
     // Limpiar los datos del dashboard.
     setToken(null);
     setUser(null);
+    setCurrentUser(null);
     setPets([]);
+    setShowPetForm(false);
     setError("");
 
     // Volver a la página de inicio.
@@ -246,6 +373,7 @@ export default function DashboardPage() {
   }
 
   function openPetForm() {
+    if (user?.rol !== "PROPIETARIO") return;
     setError("");
     setShowPetForm(true);
   }
@@ -260,6 +388,12 @@ export default function DashboardPage() {
   async function addPet(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+
+    // Protección de interfaz; el backend también debe autorizar este endpoint.
+    if (user?.rol !== "PROPIETARIO") {
+      setError("Solo las cuentas de propietario pueden registrar mascotas.");
+      return;
+    }
 
     if (!token) {
       authService.logout();
@@ -373,7 +507,7 @@ export default function DashboardPage() {
         </div>
 
         <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
-          Mi espacio
+          {user.rol === "ADMINISTRADOR" ? "Administración" : "Mi espacio"}
         </p>
 
         <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-3 py-3 font-semibold text-emerald-900">
@@ -381,23 +515,53 @@ export default function DashboardPage() {
           Resumen
         </div>
 
-        <a
-          href="#mascotas"
-          className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
-        >
-          <PawPrint size={19} />
-          Mis mascotas
-        </a>
+        {user.rol === "PROPIETARIO" && (
+          <>
+            <a
+              href="#mascotas"
+              className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
+            >
+              <PawPrint size={19} />
+              Mis mascotas
+            </a>
 
-        <div className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500">
-          <CalendarDays size={19} />
-          Calendario de salud
-        </div>
+            <a
+              href="#calendario-salud"
+              className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
+            >
+              <CalendarDays size={19} />
+              Calendario de salud
+            </a>
 
-        <div className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500">
-          <Syringe size={19} />
-          Vacunación
-        </div>
+            <a
+              href="#vacunacion"
+              className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
+            >
+              <Syringe size={19} />
+              Vacunación
+            </a>
+          </>
+        )}
+
+        {(user.rol === "VETERINARIA" || user.rol === "EMPRESA") && (
+          <a
+            href="#perfil-negocio"
+            className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
+          >
+            <Activity size={19} />
+            Perfil del establecimiento
+          </a>
+        )}
+
+        {user.rol === "ADMINISTRADOR" && (
+          <a
+            href="#administracion"
+            className="mt-2 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-800"
+          >
+            <Activity size={19} />
+            Herramientas
+          </a>
+        )}
 
         <div className="mt-auto rounded-2xl bg-[#173d32] p-4 text-white">
           <Heart size={20} className="mb-3 text-emerald-300" />
@@ -422,12 +586,16 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 font-semibold text-emerald-900">
-              {user.nombre.slice(0, 1).toUpperCase()}
+              {(user.nombre ?? "U").slice(0, 1).toUpperCase()}
             </div>
 
             <div className="hidden sm:block">
               <p className="text-sm font-semibold">{user.nombre}</p>
               <p className="text-xs text-slate-500">{user.correo}</p>
+
+              <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                {ROLE_LABELS[user.rol]}
+              </span>
             </div>
 
             <button
@@ -446,24 +614,26 @@ export default function DashboardPage() {
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="mb-2 text-sm font-medium text-emerald-700">
-                TU ESPACIO DE BIENESTAR
+                {getDashboardContent(user.rol).eyebrow}
               </p>
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Hola, {user.nombre.split(" ")[0]} 👋
+                Hola, {user.nombre || "bienvenido"} 👋
               </h1>
               <p className="mt-2 text-slate-500">
-                Así va el bienestar de tu familia peluda.
+                {getDashboardContent(user.rol).description}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={openPetForm}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#173d32] px-5 py-3.5 font-semibold text-white transition hover:bg-emerald-900"
-            >
-              <Plus size={18} />
-              Añadir mascota
-            </button>
+            {user.rol === "PROPIETARIO" && (
+              <button
+                type="button"
+                onClick={openPetForm}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#173d32] px-5 py-3.5 font-semibold text-white transition hover:bg-emerald-900"
+              >
+                <Plus size={18} />
+                Añadir mascota
+              </button>
+            )}
           </div>
 
           {error && (
@@ -482,146 +652,317 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <Stat
-              icon={<PawPrint />}
-              label="Mis mascotas"
-              value={String(pets.length)}
-              note="Compañeros registrados"
-            />
-            <Stat
-              icon={<Syringe />}
-              label="Vacunas registradas"
-              value="—"
-              note="Mantén su esquema al día"
-            />
-            <Stat
-              icon={<CalendarDays />}
-              label="Próximos cuidados"
-              value="—"
-              note="Organiza tus recordatorios"
-            />
-          </div>
-
-          <div className="mt-9 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-            <section
-              id="mascotas"
-              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7"
-            >
-              <div className="mb-6 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Mis mascotas</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Sus perfiles, siempre a mano.
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800">
-                  {pets.length} registradas
-                </span>
+          {user.rol === "PROPIETARIO" && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <Stat
+                  icon={<PawPrint />}
+                  label="Mis mascotas"
+                  value={String(pets.length)}
+                  note="Compañeros registrados"
+                />
+                <Stat
+                  icon={<Syringe />}
+                  label="Vacunas registradas"
+                  value="—"
+                  note="Mantén su esquema al día"
+                />
+                <Stat
+                  icon={<CalendarDays />}
+                  label="Próximos cuidados"
+                  value="—"
+                  note="Organiza tus recordatorios"
+                />
               </div>
 
-              {pets.length > 0 ? (
-                <div className="space-y-3">
-                  {pets.map((pet) => (
-                    <div
-                      key={pet.id}
-                      className="flex items-center gap-4 rounded-xl border border-slate-100 p-4 transition hover:border-emerald-200"
-                    >
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
-                        {pet.especie === "GATO" ? (
-                          <Cat size={27} />
-                        ) : (
-                          <Dog size={27} />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">{pet.nombre}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {pet.especie === "GATO" ? "Gato" : "Perro"}
-                          {pet.raza ? ` · ${pet.raza}` : ""}
-                          {pet.pesoKg != null && pet.pesoKg !== ""
-                            ? ` · ${pet.pesoKg} kg`
-                            : ""}
-                        </p>
-                        <p className="mt-1 text-xs text-emerald-700">
-                          Edad: {formatPetAge(pet.fechaNacimiento)}
-                        </p>
-                      </div>
-
-                      <ChevronRight className="text-slate-400" size={19} />
+              <div className="mt-9 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+                <section
+                  id="mascotas"
+                  className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7"
+                >
+                  <div className="mb-6 flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold">Mis mascotas</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Sus perfiles, siempre a mano.
+                      </p>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
-                    <PawPrint size={26} />
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800">
+                      {pets.length} registradas
+                    </span>
                   </div>
-                  <p className="font-semibold">Tu historia empieza aquí</p>
-                  <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">
-                    Registra tu primera mascota para empezar a organizar su
-                    bienestar.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={openPetForm}
-                    className="mt-5 inline-flex items-center gap-2 font-semibold text-emerald-800 hover:underline"
-                  >
-                    Registrar mascota <Plus size={16} />
-                  </button>
-                </div>
-              )}
-            </section>
 
-            <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="rounded-xl bg-amber-50 p-3 text-amber-700">
-                  <CalendarDays size={21} />
-                </div>
-                <div>
-                  <h2 className="font-semibold">Rutina de bienestar</h2>
-                  <p className="text-sm text-slate-500">
-                    Pequeños hábitos, gran diferencia.
-                  </p>
-                </div>
-              </div>
+                  {pets.length > 0 ? (
+                    <div className="space-y-3">
+                      {pets.map((pet) => (
+                        <div
+                          key={pet.id}
+                          className="flex items-center gap-4 rounded-xl border border-slate-100 p-4 transition hover:border-emerald-200"
+                        >
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+                            {pet.especie === "GATO" ? (
+                              <Cat size={27} />
+                            ) : (
+                              <Dog size={27} />
+                            )}
+                          </div>
 
-              <div className="space-y-4">
-                {[
-                  ["Agua fresca", "Renueva su agua varias veces al día."],
-                  ["Movimiento diario", "Adapta el paseo a su edad y energía."],
-                  [
-                    "Chequeo preventivo",
-                    "Consulta con su veterinario las fechas importantes.",
-                  ],
-                ].map(([title, desc]) => (
-                  <div key={title} className="flex gap-3">
-                    <div className="mt-0.5 rounded-full bg-emerald-50 p-1.5 text-emerald-700">
-                      <Check size={14} />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{pet.nombre}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {pet.especie === "GATO" ? "Gato" : "Perro"}
+                              {pet.raza ? ` · ${pet.raza}` : ""}
+                              {pet.pesoKg != null && pet.pesoKg !== ""
+                                ? ` · ${pet.pesoKg} kg`
+                                : ""}
+                            </p>
+                            <p className="mt-1 text-xs text-emerald-700">
+                              Edad: {formatPetAge(pet.fechaNacimiento)}
+                            </p>
+                          </div>
+
+                          <ChevronRight className="text-slate-400" size={19} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center">
+                      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+                        <PawPrint size={26} />
+                      </div>
+                      <p className="font-semibold">Tu historia empieza aquí</p>
+                      <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                        Registra tu primera mascota para empezar a organizar su
+                        bienestar.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openPetForm}
+                        className="mt-5 inline-flex items-center gap-2 font-semibold text-emerald-800 hover:underline"
+                      >
+                        Registrar mascota <Plus size={16} />
+                      </button>
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="rounded-xl bg-amber-50 p-3 text-amber-700">
+                      <CalendarDays size={21} />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold">{title}</p>
-                      <p className="mt-1 text-sm leading-5 text-slate-500">
-                        {desc}
+                      <h2 className="font-semibold">Rutina de bienestar</h2>
+                      <p className="text-sm text-slate-500">
+                        Pequeños hábitos, gran diferencia.
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <div className="mt-6 rounded-xl bg-[#f1f8f3] p-4">
-                <div className="flex gap-2 text-emerald-800">
-                  <Sparkles size={17} />
-                  <p className="text-sm font-semibold">Un consejo para hoy</p>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Un registro actualizado ayuda a llevar un mejor seguimiento de
-                  su salud.
+                  <div className="space-y-4">
+                    {[
+                      ["Agua fresca", "Renueva su agua varias veces al día."],
+                      [
+                        "Movimiento diario",
+                        "Adapta el paseo a su edad y energía.",
+                      ],
+                      [
+                        "Chequeo preventivo",
+                        "Consulta con su veterinario las fechas importantes.",
+                      ],
+                    ].map(([title, desc]) => (
+                      <div key={title} className="flex gap-3">
+                        <div className="mt-0.5 rounded-full bg-emerald-50 p-1.5 text-emerald-700">
+                          <Check size={14} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{title}</p>
+                          <p className="mt-1 text-sm leading-5 text-slate-500">
+                            {desc}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 rounded-xl bg-[#f1f8f3] p-4">
+                    <div className="flex gap-2 text-emerald-800">
+                      <Sparkles size={17} />
+                      <p className="text-sm font-semibold">
+                        Un consejo para hoy
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Un registro actualizado ayuda a llevar un mejor
+                      seguimiento de su salud.
+                    </p>
+                  </div>
+                  <div className="mt-9">
+                    {token && <Vacunacion pets={pets} token={token} />}
+                  </div>
+                </section>
+              </div>
+            </>
+          )}
+
+          {(user.rol === "VETERINARIA" || user.rol === "EMPRESA") && (
+            <section
+              id="perfil-negocio"
+              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7"
+            >
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold">
+                  Perfil del establecimiento
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Información asociada a tu cuenta. Si algún dato aparece como
+                  no registrado, revisa que el endpoint /auth/me lo incluya.
                 </p>
               </div>
+
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                  {ROLE_LABELS[user.rol]}
+                </span>
+                {currentUser?.cuenta?.estado && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                    {getStatusLabel(currentUser.cuenta.estado)}
+                  </span>
+                )}
+                {currentUser?.proveedor?.estado_proveedor && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {getStatusLabel(currentUser.proveedor.estado_proveedor)}
+                  </span>
+                )}
+              </div>
+
+              {!currentUser?.proveedor ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-sm leading-6 text-slate-600">
+                  No se recibió el perfil del proveedor. Verifica que GET
+                  /auth/me devuelva la relación proveedor y sus datos
+                  relacionados para este rol.
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <ProfileItem
+                      label="Nombre comercial"
+                      value={currentUser.proveedor.nombre_comercial}
+                    />
+                    <ProfileItem
+                      label="Correo de acceso"
+                      value={currentUser.cuenta.correo}
+                    />
+                    <ProfileItem
+                      label="Teléfono de contacto"
+                      value={currentUser.proveedor.telefono_contacto}
+                    />
+                    <ProfileItem
+                      label="Ciudad"
+                      value={currentUser.proveedor.ciudad}
+                    />
+                    <ProfileItem
+                      label="Dirección"
+                      value={currentUser.proveedor.direccion}
+                    />
+                    <ProfileItem
+                      label="Sitio web"
+                      value={currentUser.proveedor.sitio_web}
+                    />
+                    <ProfileItem
+                      label="Descripción"
+                      value={currentUser.proveedor.descripcion}
+                    />
+                    {user.rol === "VETERINARIA" && (
+                      <>
+                        <ProfileItem
+                          label="Responsable"
+                          value={
+                            currentUser.proveedor.veterinaria
+                              ?.nombre_responsable
+                          }
+                        />
+                        <ProfileItem
+                          label="Registro profesional"
+                          value={
+                            currentUser.proveedor.veterinaria
+                              ?.registro_profesional
+                          }
+                        />
+                        <ProfileItem
+                          label="Horario de atención"
+                          value={
+                            currentUser.proveedor.veterinaria?.horario_atencion
+                          }
+                        />
+                        <ProfileItem
+                          label="Servicios clínicos"
+                          value={
+                            currentUser.proveedor.veterinaria
+                              ?.servicios_clinicos
+                          }
+                        />
+                      </>
+                    )}
+                    {user.rol === "EMPRESA" && (
+                      <>
+                        <ProfileItem
+                          label="Identificación tributaria"
+                          value={
+                            currentUser.proveedor.empresa
+                              ?.identificacion_tributaria
+                          }
+                        />
+                        <ProfileItem
+                          label="Categoría comercial"
+                          value={
+                            currentUser.proveedor.empresa?.categoria_comercial
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </section>
-          </div>
+          )}
+
+          {user.rol === "ADMINISTRADOR" && (
+            <section
+              id="administracion"
+              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7"
+            >
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold">
+                  Herramientas de administración
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Accesos de referencia para organizar el panel. Las operaciones
+                  deben conectarse a endpoints administrativos protegidos en el
+                  backend antes de estar disponibles.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <AdminAction
+                  title="Cuentas y usuarios"
+                  description="Consulta y administra cuentas, roles y estados mediante endpoints exclusivos para administradores."
+                />
+                <AdminAction
+                  title="Verificación de proveedores"
+                  description="Revisa solicitudes pendientes de veterinarias y empresas y registra decisiones de aprobación."
+                />
+                <AdminAction
+                  title="Estado de la plataforma"
+                  description="Supervisa métricas y reportes cuando existan endpoints administrativos para esos datos."
+                />
+              </div>
+              <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                Importante: ocultar secciones en el frontend no es una medida de
+                seguridad. El backend debe validar el rol ADMINISTRADOR en cada
+                endpoint protegido.
+              </p>
+            </section>
+          )}
 
           <p className="mt-8 text-center text-xs text-slate-400">
             MyPetCo · Cuidamos a quienes hacen especial tu vida.
@@ -629,7 +970,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {showPetForm && (
+      {showPetForm && user.rol === "PROPIETARIO" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm"
           onMouseDown={(e) => {

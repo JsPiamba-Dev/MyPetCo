@@ -1,4 +1,3 @@
-
 import {
   Body,
   Controller,
@@ -7,6 +6,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import {
   ForgotPasswordDto,
@@ -15,6 +15,14 @@ import {
   ResetPasswordDto,
 } from './dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    sub: string;
+    correo: string;
+    rol?: string;
+  };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -32,7 +40,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req: any) {
+  me(@Req() req: AuthenticatedRequest) {
     return this.auth.me(req.user.sub);
   }
 
