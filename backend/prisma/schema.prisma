@@ -114,6 +114,7 @@ model mascotas {
   recordatorios         recordatorios[]
   registros_peso        registros_peso[]
   registros_vacunacion  registros_vacunacion[]
+  citas                 citas[]
 
   @@index([especie, raza], map: "idx_mascotas_especie_raza")
   @@index([propietario_id, nombre], map: "idx_mascotas_propietario_nombre")
@@ -176,6 +177,7 @@ model proveedores {
   empresas             empresas?
   cuentas_acceso       cuentas_acceso               @relation(fields: [cuenta_id], references: [id], onDelete: Cascade, map: "fk_proveedores_cuenta")
   publicaciones        publicaciones[]
+  citas                citas[]
   veterinarias         veterinarias?
 
   @@index([estado_proveedor, ciudad], map: "idx_proveedores_estado_ciudad")
@@ -198,6 +200,7 @@ model publicaciones {
   proveedores         proveedores        @relation(fields: [proveedor_id], references: [cuenta_id], onDelete: Cascade, map: "fk_publicaciones_proveedor")
   recomendaciones     recomendaciones[]
   servicios           servicios?
+  citas_servicio      citas[]            @relation("citas_servicio")
 
   @@index([activa, tipo, ciudad], map: "idx_publicaciones_activa_tipo_ciudad")
   @@index([proveedor_id], map: "idx_publicaciones_proveedor")
@@ -343,6 +346,7 @@ model usuarios {
   preferencias_usuario preferencias_usuario?
   recomendaciones      recomendaciones[]
   recordatorios        recordatorios[]
+  citas_propietario    citas[]                @relation("citas_propietario")
   cuentas_acceso       cuentas_acceso         @relation(fields: [cuenta_id], references: [id], onDelete: Cascade, map: "fk_usuarios_cuenta")
 
   @@index([ciudad], map: "idx_usuarios_ciudad")
@@ -498,4 +502,54 @@ enum registros_vacunacion_estado {
   PENDIENTE
   POR_VERIFICAR
   ANULADA
+}
+
+/// Citas entre propietarios y veterinarias.
+enum citas_estado {
+  SOLICITADA
+  CONFIRMADA
+  RECHAZADA
+  CANCELADA
+  COMPLETADA
+}
+
+model citas {
+  id                  String       @id @db.Char(36)
+  mascota_id          String       @db.Char(36)
+  propietario_id      String       @db.Char(36)
+  proveedor_id        String       @db.Char(36)
+  servicio_id         String?      @db.Char(36)
+  fecha_solicitada    DateTime
+  estado              citas_estado @default(SOLICITADA)
+  motivo              String?      @db.Text
+  notas_proveedor     String?      @db.Text
+  fecha_creacion      DateTime     @default(now())
+  fecha_actualizacion DateTime     @updatedAt
+
+  mascotas      mascotas       @relation(fields: [mascota_id], references: [id], onDelete: Cascade, map: "fk_citas_mascota")
+  usuarios      usuarios       @relation("citas_propietario", fields: [propietario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_citas_propietario")
+  proveedores   proveedores    @relation(fields: [proveedor_id], references: [cuenta_id], onDelete: Cascade, map: "fk_citas_proveedor")
+  publicaciones publicaciones? @relation("citas_servicio", fields: [servicio_id], references: [id], onDelete: SetNull, map: "fk_citas_servicio")
+
+  @@index([propietario_id, fecha_solicitada], map: "idx_citas_propietario_fecha")
+  @@index([proveedor_id, estado, fecha_solicitada], map: "idx_citas_proveedor_estado_fecha")
+  @@index([mascota_id], map: "idx_citas_mascota")
+  @@index([servicio_id], map: "idx_citas_servicio")
+}
+
+/// Metadatos de credenciales para integraciones externas. El JWT no se almacena.
+model external_api_tokens {
+  id                 String    @id @db.Char(36)
+  client_name        String    @db.VarChar(150)
+  contract_reference String    @db.VarChar(100)
+  purpose            String    @db.VarChar(255)
+  scopes             Json
+  created_by_id      String    @db.Char(36)
+  created_at         DateTime  @default(now())
+  expires_at         DateTime
+  revoked_at         DateTime?
+  last_used_at       DateTime?
+
+  @@index([expires_at, revoked_at], map: "idx_external_tokens_active_expiry")
+  @@index([created_by_id, created_at], map: "idx_external_tokens_creator")
 }

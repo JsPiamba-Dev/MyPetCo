@@ -26,7 +26,16 @@ import {
 } from "../../services/auth.service";
 import { petsService, type Pet } from "../../services/pets.service";
 
-import Vacunacion from "../../components/vacunacion";
+import Vacunacion from "../../components/propietario/vacunacion";
+import CalendarioSalud from "../../components/propietario/calendario-salud";
+import PublicarProducto from "../../components/empresa/publicar-producto";
+import PublicarServicioEmpresa from "../../components/empresa/publicar-servicio";
+import PublicarServicioVeterinaria from "../../components/veterinaria/publicar-servicio";
+import GestionarCitas from "../../components/veterinaria/gestionar-citas";
+import CatalogoProveedores from "../../components/propietario/catalogo-proveedores";
+import SolicitarCita from "../../components/propietario/solicitar-cita";
+import MisCitas from "../../components/propietario/mis-citas";
+import PanelAdministracion from "../../components/admin/panel-administracion";
 
 type ProviderProfile = {
   nombre_comercial: string;
@@ -800,7 +809,16 @@ export default function DashboardPage() {
                   <div className="mt-9">
                     {token && <Vacunacion pets={pets} token={token} />}
                   </div>
+                  <div className="mt-9">
+                    <CalendarioSalud pets={pets} />
+                  </div>
                 </section>
+              </div>
+
+              <div className="mt-8 grid gap-6">
+                <CatalogoProveedores />
+                <SolicitarCita pets={pets} />
+                <MisCitas />
               </div>
             </>
           )}
@@ -927,42 +945,21 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {user.rol === "ADMINISTRADOR" && (
-            <section
-              id="administracion"
-              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7"
-            >
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold">
-                  Herramientas de administración
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Accesos de referencia para organizar el panel. Las operaciones
-                  deben conectarse a endpoints administrativos protegidos en el
-                  backend antes de estar disponibles.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <AdminAction
-                  title="Cuentas y usuarios"
-                  description="Consulta y administra cuentas, roles y estados mediante endpoints exclusivos para administradores."
-                />
-                <AdminAction
-                  title="Verificación de proveedores"
-                  description="Revisa solicitudes pendientes de veterinarias y empresas y registra decisiones de aprobación."
-                />
-                <AdminAction
-                  title="Estado de la plataforma"
-                  description="Supervisa métricas y reportes cuando existan endpoints administrativos para esos datos."
-                />
-              </div>
-              <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                Importante: ocultar secciones en el frontend no es una medida de
-                seguridad. El backend debe validar el rol ADMINISTRADOR en cada
-                endpoint protegido.
-              </p>
-            </section>
+          {user.rol === "EMPRESA" && (
+            <div className="mt-8 grid gap-6">
+              <PublicarProducto />
+              <PublicarServicioEmpresa />
+            </div>
           )}
+
+          {user.rol === "VETERINARIA" && (
+            <div className="mt-8 grid gap-6">
+              <PublicarServicioVeterinaria />
+              <GestionarCitas />
+            </div>
+          )}
+
+          {user.rol === "ADMINISTRADOR" && <PanelAdministracion />}
 
           <p className="mt-8 text-center text-xs text-slate-400">
             MyPetCo · Cuidamos a quienes hacen especial tu vida.

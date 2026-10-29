@@ -18,8 +18,8 @@ import {
   vacunasService,
   type Vacuna,
   type RegistroVacunacion,
-} from "../services/vacunas.service";
-import type { Pet } from "../services/pets.service";
+} from "../../services/vacunas.service";
+import type { Pet } from "../../services/pets.service";
 
 type Props = {
   pets: Pet[];
