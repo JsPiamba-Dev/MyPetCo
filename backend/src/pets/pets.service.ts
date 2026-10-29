@@ -1,3 +1,4 @@
+
 import {
   Injectable,
   NotFoundException,
@@ -9,7 +10,7 @@ import { CreatePetDto, UpdatePetDto } from './dto';
 
 @Injectable()
 export class PetsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Listar las mascotas de un propietario
   async list(userId: string) {
@@ -54,6 +55,7 @@ export class PetsService {
       edadAproximadaMeses,
       fechaEsterilizacion,
       pesoKg,
+      enfermedadesAdquiridas,
       ...rest
     } = dto;
 
@@ -80,12 +82,20 @@ export class PetsService {
           ? { edad_aproximada_meses: edadAproximadaMeses }
           : {}),
 
-        ...(fechaEsterilizacion
-          ? { fecha_esterilizacion: new Date(fechaEsterilizacion) }
+        ...(fechaEsterilizacion !== undefined
+          ? {
+              fecha_esterilizacion: fechaEsterilizacion
+                ? new Date(fechaEsterilizacion)
+                : null,
+            }
           : {}),
 
         ...(pesoKg !== undefined
           ? { peso_kg: pesoKg }
+          : {}),
+
+        ...(enfermedadesAdquiridas !== undefined
+          ? { enfermedades_adquiridas: enfermedadesAdquiridas }
           : {}),
       },
     });
@@ -100,6 +110,7 @@ export class PetsService {
       fechaEsterilizacion,
       edadAproximadaMeses,
       pesoKg,
+      enfermedadesAdquiridas,
       ...rest
     } = dto;
 
@@ -107,25 +118,33 @@ export class PetsService {
       where: { id },
       data: {
         ...rest,
+
         ...(fechaNacimiento !== undefined
           ? {
-            fecha_nacimiento: fechaNacimiento
-              ? new Date(fechaNacimiento)
-              : null,
-          }
+              fecha_nacimiento: fechaNacimiento
+                ? new Date(fechaNacimiento)
+                : null,
+            }
           : {}),
+
         ...(fechaEsterilizacion !== undefined
           ? {
-            fecha_esterilizacion: fechaEsterilizacion
-              ? new Date(fechaEsterilizacion)
-              : null,
-          }
+              fecha_esterilizacion: fechaEsterilizacion
+                ? new Date(fechaEsterilizacion)
+                : null,
+            }
           : {}),
+
         ...(edadAproximadaMeses !== undefined
           ? { edad_aproximada_meses: edadAproximadaMeses }
           : {}),
+
         ...(pesoKg !== undefined
           ? { peso_kg: pesoKg }
+          : {}),
+
+        ...(enfermedadesAdquiridas !== undefined
+          ? { enfermedades_adquiridas: enfermedadesAdquiridas }
           : {}),
       },
     });

@@ -1,8 +1,14 @@
+
 import { apiFetch } from "../lib/api";
 
 export type PublicacionTipo = "PRODUCTO" | "SERVICIO";
 export type EspecieObjetivo = "PERRO" | "GATO";
-export type EtapaVida = "CACHORRO_GATITO" | "JOVEN" | "ADULTO" | "SENIOR" | "NO_ESPECIFICADA";
+export type EtapaVida =
+    | "CACHORRO_GATITO"
+    | "JOVEN"
+    | "ADULTO"
+    | "SENIOR"
+    | "NO_ESPECIFICADA";
 export type TipoProveedor = "EMPRESA" | "VETERINARIA";
 
 export interface ProductoPublicacionInput {
@@ -87,27 +93,108 @@ export interface FiltrosPublicaciones {
 
 const queryString = (values: Record<string, string | undefined>) => {
     const params = new URLSearchParams();
+
     Object.entries(values).forEach(([key, value]) => {
         if (value) params.set(key, value);
     });
+
     const query = params.toString();
     return query ? `?${query}` : "";
 };
 
-/**
- * Contrato frontend propuesto. Ajustar las rutas y el DTO cuando se implementen
- * los controladores reales en NestJS. Se asume que apiFetch gestiona el token.
- */
+function filtrosQuery(filtros: FiltrosPublicaciones = {}) {
+    return queryString({
+        q: filtros.q?.trim() || undefined,
+        tipo:
+            filtros.tipo && filtros.tipo !== "TODOS"
+                ? filtros.tipo
+                : undefined,
+        proveedor:
+            filtros.proveedor && filtros.proveedor !== "TODOS"
+                ? filtros.proveedor
+                : undefined,
+        ciudad: filtros.ciudad?.trim() || undefined,
+        especie:
+            filtros.especie && filtros.especie !== "TODAS"
+                ? filtros.especie
+                : undefined,
+    });
+}
+
+function obtenerBaseUrlApi() {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!baseUrl) {
+        throw new Error(
+            "Falta configurar NEXT_PUBLIC_API_URL para consultar el catálogo público.",
+        );
+    }
+
+    return baseUrl.replace(/\/+$/, "");
+}
+
+async function listarPublicacionesSinToken(
+    filtros: FiltrosPublicaciones = {},
+): Promise<Publicacion[]> {
+    const url = `${obtenerBaseUrlApi()}/publicaciones${filtrosQuery(filtros)}`;
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: {
+            Accept: "application/json",
+        },
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(
+            `No se pudo cargar el catálogo (${response.status})${detail ? `: ${detail}` : ""
+            }`,
+        );
+    }
+
+    const result: unknown = await response.json();
+
+    // Admite respuestas como [] o { data: [] }.
+    if (Array.isArray(result)) {
+        return result as Publicacion[];
+    }
+
+    if (
+        result &&
+        typeof result === "object" &&
+        "data" in result &&
+        Array.isArray((result as { data: unknown }).data)
+    ) {
+        return (result as { data: Publicacion[] }).data;
+    }
+
+    if (
+        result &&
+        typeof result === "object" &&
+        "publicaciones" in result &&
+        Array.isArray((result as { publicaciones: unknown }).publicaciones)
+    ) {
+        return (result as { publicaciones: Publicacion[] }).publicaciones;
+    }
+
+    throw new Error("El servidor devolvió un formato de catálogo inesperado.");
+}
+
 export const publicacionesService = {
-    listar(filtros: FiltrosPublicaciones = {}) {
-        return apiFetch<Publicacion[]>(`/publicaciones${queryString({
-            q: filtros.q,
-            tipo: filtros.tipo && filtros.tipo !== "TODOS" ? filtros.tipo : undefined,
-            proveedor: filtros.proveedor && filtros.proveedor !== "TODOS" ? filtros.proveedor : undefined,
-            ciudad: filtros.ciudad,
-            especie: filtros.especie && filtros.especie !== "TODAS" ? filtros.especie : undefined,
-        })}`);
+    // Consulta pública: no usa apiFetch ni envía token.
+    listarPublico(filtros: FiltrosPublicaciones = {}) {
+        return listarPublicacionesSinToken(filtros);
     },
+
+    // Consulta autenticada: se conserva para las pantallas que la necesiten.
+    listar(filtros: FiltrosPublicaciones = {}) {
+        return apiFetch<Publicacion[]>(
+            `/publicaciones${filtrosQuery(filtros)}`,
+        );
+    },
+
     crearProducto(input: ProductoPublicacionInput) {
         return apiFetch<Publicacion>("/publicaciones/productos", {
             method: "POST",
@@ -129,6 +216,7 @@ export const publicacionesService = {
             }),
         });
     },
+
     crearServicio(input: ServicioPublicacionInput) {
         return apiFetch<Publicacion>("/publicaciones/servicios", {
             method: "POST",

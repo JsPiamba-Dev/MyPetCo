@@ -9,20 +9,22 @@ datasource db {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-model autorizaciones_datos {
-  id                       String       @id @db.Char(36)
-  usuario_id               String       @db.Char(36)
-  proveedor_id             String?      @db.Char(36)
-  finalidad                String       @db.VarChar(255)
-  fecha_autorizacion       DateTime     @default(now())
-  fecha_revocacion         DateTime?
-  vigente                  Boolean      @default(true)
-  version_aviso_privacidad String       @db.VarChar(30)
-  proveedores              proveedores? @relation(fields: [proveedor_id], references: [cuenta_id], map: "fk_autorizaciones_proveedor")
-  usuarios                 usuarios     @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_autorizaciones_usuario")
 
-  @@index([proveedor_id], map: "idx_autorizaciones_proveedor")
+model autorizaciones_datos {
+  id                       String    @id @db.Char(36)
+  usuario_id               String?   @db.Char(36)
+  proveedor_id             String?   @db.Char(36)
+  finalidad                String    @db.VarChar(255)
+  fecha_autorizacion       DateTime  @default(now()) @db.DateTime(3)
+  fecha_revocacion         DateTime? @db.DateTime(3)
+  vigente                  Boolean   @default(true)
+  version_aviso_privacidad String    @db.VarChar(30)
+
+  usuarios    usuarios?    @relation(fields: [usuario_id], references: [cuenta_id], onDelete: Cascade, map: "fk_autorizaciones_usuario")
+  proveedores proveedores? @relation(fields: [proveedor_id], references: [cuenta_id], map: "fk_autorizaciones_proveedor")
+
   @@index([usuario_id, vigente], map: "idx_autorizaciones_usuario_vigente")
+  @@index([proveedor_id], map: "idx_autorizaciones_proveedor")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -93,28 +95,29 @@ model historial_salud {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mascotas {
-  id                    String                 @id @db.Char(36)
-  propietario_id        String                 @db.Char(36)
-  nombre                String                 @db.VarChar(100)
-  especie               mascotas_especie
-  raza                  String?                @db.VarChar(100)
-  fecha_nacimiento      DateTime?              @db.Date
-  edad_aproximada_meses Int?                   @db.UnsignedInt
-  sexo                  mascotas_sexo          @default(DESCONOCIDO)
-  peso_kg               Decimal?               @db.Decimal(5, 2)
-  esterilizada          Boolean                @default(false)
-  fecha_esterilizacion  DateTime?              @db.Date
-  foto                  String?                @db.VarChar(500)
-  observaciones         String?                @db.Text
-  fecha_registro        DateTime               @default(now())
-  fecha_retiro          DateTime?
-  historial_salud       historial_salud[]
-  usuarios              usuarios               @relation(fields: [propietario_id], references: [cuenta_id], map: "fk_mascotas_propietario")
-  recomendaciones       recomendaciones[]
-  recordatorios         recordatorios[]
-  registros_peso        registros_peso[]
-  registros_vacunacion  registros_vacunacion[]
-  citas                 citas[]
+  id                      String                 @id @db.Char(36)
+  propietario_id          String                 @db.Char(36)
+  nombre                  String                 @db.VarChar(100)
+  especie                 mascotas_especie
+  raza                    String?                @db.VarChar(100)
+  fecha_nacimiento        DateTime?              @db.Date
+  edad_aproximada_meses   Int?                   @db.UnsignedInt
+  sexo                    mascotas_sexo          @default(DESCONOCIDO)
+  peso_kg                 Decimal?               @db.Decimal(5, 2)
+  esterilizada            Boolean                @default(false)
+  enfermedades_adquiridas String?                @db.Text
+  fecha_esterilizacion    DateTime?              @db.Date
+  foto                    String?                @db.VarChar(500)
+  observaciones           String?                @db.Text
+  fecha_registro          DateTime               @default(now())
+  fecha_retiro            DateTime?
+  historial_salud         historial_salud[]
+  usuarios                usuarios               @relation(fields: [propietario_id], references: [cuenta_id], map: "fk_mascotas_propietario")
+  recomendaciones         recomendaciones[]
+  recordatorios           recordatorios[]
+  registros_peso          registros_peso[]
+  registros_vacunacion    registros_vacunacion[]
+  citas                   citas[]
 
   @@index([especie, raza], map: "idx_mascotas_especie_raza")
   @@index([propietario_id, nombre], map: "idx_mascotas_propietario_nombre")

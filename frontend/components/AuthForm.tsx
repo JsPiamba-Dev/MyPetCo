@@ -1,15 +1,9 @@
-
 "use client";
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  PawPrint,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, PawPrint, ShieldCheck } from "lucide-react";
 import {
   authService,
   type RegisterData,
@@ -195,9 +189,9 @@ export default function AuthForm({ mode }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [autorizacionPromociones, setAutorizacionPromociones] = useState(false);
 
-  const fields =
-    rol === "ADMINISTRADOR" ? [] : fieldsByRole[rol];
+  const fields = rol === "ADMINISTRADOR" ? [] : fieldsByRole[rol];
 
   function updateField(name: string, value: string) {
     setValues((previous) => ({
@@ -223,9 +217,7 @@ export default function AuthForm({ mode }: Props) {
     setError("");
 
     if (isRegister && rol === "ADMINISTRADOR") {
-      setError(
-        "El administrador debe ser creado por un proceso autorizado."
-      );
+      setError("El administrador debe ser creado por un proceso autorizado.");
       return;
     }
 
@@ -247,6 +239,7 @@ export default function AuthForm({ mode }: Props) {
           rol,
           correo: correoNormalizado,
           contrasena,
+          autorizacion_promociones: autorizacionPromociones,
         } as RegisterData;
 
         // No enviar campos vacíos opcionales.
@@ -278,16 +271,14 @@ export default function AuthForm({ mode }: Props) {
       setError(
         err instanceof Error
           ? err.message
-          : "No fue posible conectar con el servidor."
+          : "No fue posible conectar con el servidor.",
       );
     } finally {
       setBusy(false);
     }
   }
 
-  const homeHref = authService.getToken()
-    ? "/dashboard"
-    : "/";
+  const homeHref = authService.getToken() ? "/dashboard" : "/";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f7faf7] px-5 py-10">
@@ -301,16 +292,11 @@ export default function AuthForm({ mode }: Props) {
           Volver
         </button>
 
-        <Link
-          href={homeHref}
-          className="mb-8 flex w-fit items-center gap-3"
-        >
+        <Link href={homeHref} className="mb-8 flex w-fit items-center gap-3">
           <div className="rounded-xl bg-emerald-100 p-3 text-emerald-800">
             <PawPrint size={26} />
           </div>
-          <span className="text-2xl font-bold text-slate-900">
-            MyPetCo
-          </span>
+          <span className="text-2xl font-bold text-slate-900">MyPetCo</span>
         </Link>
 
         <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">
@@ -344,20 +330,15 @@ export default function AuthForm({ mode }: Props) {
                   onChange={(e) => {
                     setRol(e.target.value as UserRole);
                     setValues({});
+                    setAutorizacionPromociones(false);
                     setError("");
                   }}
                   disabled={busy}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                 >
-                  <option value="PROPIETARIO">
-                    Propietario de mascota
-                  </option>
-                  <option value="VETERINARIA">
-                    Veterinaria
-                  </option>
-                  <option value="EMPRESA">
-                    Empresa
-                  </option>
+                  <option value="PROPIETARIO">Propietario de mascota</option>
+                  <option value="VETERINARIA">Veterinaria</option>
+                  <option value="EMPRESA">Empresa</option>
                   <option value="ADMINISTRADOR" disabled>
                     Administrador (acceso autorizado)
                   </option>
@@ -393,9 +374,8 @@ export default function AuthForm({ mode }: Props) {
 
               {rol === "ADMINISTRADOR" && (
                 <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  Las cuentas de administrador deben ser autorizadas
-                  por el sistema. No es posible registrarse públicamente
-                  con este rol.
+                  Las cuentas de administrador deben ser autorizadas por el
+                  sistema. No es posible registrarse públicamente con este rol.
                 </p>
               )}
             </>
@@ -438,13 +418,9 @@ export default function AuthForm({ mode }: Props) {
               minLength={8}
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value)}
-              autoComplete={
-                isRegister ? "new-password" : "current-password"
-              }
+              autoComplete={isRegister ? "new-password" : "current-password"}
               disabled={busy}
-              placeholder={
-                isRegister ? "Mínimo 8 caracteres" : "Tu contraseña"
-              }
+              placeholder={isRegister ? "Mínimo 8 caracteres" : "Tu contraseña"}
               className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
             />
           </div>
@@ -472,6 +448,54 @@ export default function AuthForm({ mode }: Props) {
             </div>
           )}
 
+          {isRegister && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  id="autorizacionPromociones"
+                  name="autorizacion_promociones"
+                  type="checkbox"
+                  checked={autorizacionPromociones}
+                  onChange={(e) => setAutorizacionPromociones(e.target.checked)}
+                  disabled={busy}
+                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                />
+
+                <div>
+                  <label
+                    htmlFor="autorizacionPromociones"
+                    className="cursor-pointer text-sm font-semibold leading-5 text-slate-800"
+                  >
+                    Autorización para comunicaciones, promociones y campañas
+                    <span className="ml-1 font-normal text-slate-500">
+                      (opcional)
+                    </span>
+                  </label>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Autorizo de manera previa, expresa e informada a MyPetCo
+                    para recolectar y tratar mis datos personales con la
+                    finalidad de enviarme información comercial, promociones,
+                    novedades, encuestas y realizar análisis estadísticos.
+                    También autorizo su utilización y comunicación a aliados
+                    comerciales y organizaciones colaboradoras, cuando sea
+                    necesario para desarrollar campañas e iniciativas
+                    relacionadas con el bienestar, cuidado y protección animal.
+                  </p>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Entiendo que esta autorización es voluntaria y que negarme a
+                    otorgarla no afecta la creación ni el uso de mi cuenta.
+                    Podré solicitar la consulta, actualización o rectificación
+                    de mis datos, así como revocar esta autorización o solicitar
+                    su supresión en los términos de la normativa aplicable y
+                    mediante los canales habilitados por MyPetCo.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!isRegister && (
             <div className="flex justify-end">
               <Link
@@ -495,9 +519,7 @@ export default function AuthForm({ mode }: Props) {
 
           <button
             type="submit"
-            disabled={
-              busy || (isRegister && rol === "ADMINISTRADOR")
-            }
+            disabled={busy || (isRegister && rol === "ADMINISTRADOR")}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#173d32] px-5 py-4 font-semibold text-white transition hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy

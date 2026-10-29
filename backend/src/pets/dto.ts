@@ -1,4 +1,6 @@
+
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -54,6 +56,10 @@ export class CreatePetDto {
   edadAproximadaMeses?: number;
 
   @IsOptional()
+  @IsBoolean()
+  esterilizada?: boolean;
+
+  @IsOptional()
   @IsDateString()
   fechaEsterilizacion?: string;
 
@@ -61,6 +67,11 @@ export class CreatePetDto {
   @IsString()
   @MaxLength(500)
   foto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  enfermedadesAdquiridas?: string | null;
 }
 
 export class UpdatePetDto {
@@ -104,6 +115,10 @@ export class UpdatePetDto {
   edadAproximadaMeses?: number;
 
   @IsOptional()
+  @IsBoolean()
+  esterilizada?: boolean;
+
+  @IsOptional()
   @IsDateString()
   fechaEsterilizacion?: string;
 
@@ -111,4 +126,9 @@ export class UpdatePetDto {
   @IsString()
   @MaxLength(500)
   foto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  enfermedadesAdquiridas?: string | null;
 }

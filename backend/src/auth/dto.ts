@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsBoolean,
   MaxLength,
   MinLength,
   ValidateIf,
@@ -42,6 +43,11 @@ export class RegisterDto {
   @MinLength(8)
   @MaxLength(72)
   contrasena: string;
+
+  // Autorización opcional para comunicaciones comerciales
+  @IsOptional()
+  @IsBoolean()
+  autorizacion_promociones?: boolean;
 
   @ValidateIf(
     (dto: RegisterDto) =>
@@ -161,4 +167,111 @@ export class ResetPasswordDto {
   @MinLength(8)
   @MaxLength(72)
   contrasena: string;
+}
+
+// ACTUALIZAR PERFIL
+export class UpdateProfileDto {
+  // Propietario
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  telefono?: string;
+
+  // Datos generales del establecimiento
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(150)
+  nombre_comercial?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  telefono_contacto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  ciudad?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  direccion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  sitio_web?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  descripcion?: string;
+
+  // Datos de veterinaria
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(150)
+  nombre_responsable?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  registro_profesional?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  horario_atencion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  servicios_clinicos?: string;
+
+  // Datos de empresa
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(30)
+  identificacion_tributaria?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  categoria_comercial?: string;
+}
+
+// CAMBIAR CORREO
+export class ChangeEmailDto {
+  @IsEmail()
+  @MaxLength(254)
+  correo: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  contrasenaActual: string;
+}
+
+// CAMBIAR CONTRASEÑA CON SESIÓN AUTENTICADA
+export class ChangePasswordDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  contrasenaActual: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  nuevaContrasena: string;
 }
